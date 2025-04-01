@@ -1,21 +1,17 @@
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
-import './App.css'
-import { Button } from "./components/ui/button";
+import { Routes,Route } from "react-router-dom"
+import Home from "./pages/Home"
+import Room from "./pages/Room"
+import { useSocket } from "./hooks/useSocket"
 
 function App() {
-  return (
-    <header>
-    <SignedOut>
-      <SignInButton />
-    </SignedOut>
-    <SignedIn>
-      <UserButton />
-    </SignedIn>
 
-    <div className="flex flex-col items-center justify-center min-h-svh">
-      <Button>Click me</Button>
-    </div>
-  </header>
+  const socket= useSocket(); 
+
+  return (
+   <Routes>
+    <Route path="/" element={<Home socket={socket} />} />
+    <Route path="/room/:roomid" element={<Room socket={socket} />} />
+   </Routes>
   )
 }
 
