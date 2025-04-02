@@ -6,7 +6,6 @@ const redis = new Redis({
     host:process.env.REDIS_PUBLIC_ENDPOINT,
     port:process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT,10) : undefined,
     password:process.env.REDIS_PASSWORD,
-    tls:{},
     retryStrategy:(times) => Math.min(times*50,2000)
 });
 
