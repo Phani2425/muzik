@@ -8,6 +8,7 @@ import { connectToDb } from './config/db';
 import redis from './config/redisClient';
 import Room from './models/Room';
 import router from './routes/ytSearchRoutes';
+import { getQueue } from './utils/utils';
 
 const app = express();
 app.use(express.json());
@@ -16,22 +17,6 @@ const server = createServer(app);
 const io = new Server(server, {cors: {origin: "*"}});
 
 app.use('/api',router);
-
-const getQueue = async (roomId:string) => {
-    const key = `room:${roomId}`;
-    const trackList = await redis.zrevrange(key, 0, -1, "WITHSCORES");
-  
-    let queue = [];
-    for (let i = 0; i < trackList.length; i += 2) {
-        const track = {
-            name:trackList[i],
-            votes:trackList[i + 1]
-        }
-      queue.push(track);
-    }
-  
-    return queue;
-  };
 
 connectToDb();
 
@@ -70,9 +55,15 @@ io.on('connection', (socket) => {
 
     socket.on('addtrack',async ({track,roomId}) => {
         //if the track already exist in the set then increase its vote else add it
-        await redis.zadd(`room:${roomId}`,1,track);
+        const score = await redis.zscore(`room:${roomId}`, track);
+        if(score){
+          await redis.zincrby(`room:${roomId}`,1,track);
+        }
+        else{
+          await redis.zadd(`room:${roomId}`,1,track);
+        }
         const queue = await getQueue(roomId);
-        console.log('updated queue',queue);
+        // console.log('updated queue',queue);
         io.to(roomId).emit('queue_updated',queue);
     });
 

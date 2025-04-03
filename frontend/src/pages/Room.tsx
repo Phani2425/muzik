@@ -15,7 +15,10 @@ interface HomeProp {
 }
 
 interface track {
-  name: string;
+  id: string;
+  title: string;
+  smallThumbnail: string;
+  bigThumbnail: string;
   votes: number;
 }
 
@@ -30,6 +33,7 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   const [isSearching, setIsSearching] = useState(false);
   const { isSignedIn } = useUser();
   const [searchKeyword, setsearchKeyword] = useState("");
+  const [isAddingTrack, setIsAddingTrack] = useState(false);
 
   const validateUrl = (url: string) => {
     const urlRegex =
@@ -55,7 +59,7 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
             keyword: query,
           }
         );
-        console.log(response.data.data.items.slice(1));
+        // console.log(response.data.data.items.slice(1));
         setSearchResults(response.data.data.items.slice(1) || []);
         setIsSearching(false);
       } else {
@@ -90,47 +94,46 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
     }
   };
 
-  const addtrack = (tarckId: string = "") => {
+  const addtrack = (trackId: string = "") => {
     requireAuth(() => {
-      //agar track id aya hai then to bhai ame direct socket event emit karidaba
-      if (tarckId) {
-        socket?.emit("addtrack", {
-          track: tarckId,
-          roomid: roomid,
-        });
-      }
+      setIsAddingTrack(true);
 
-      //au jadi asini the ta bhai ame chcek kariba ki inputref re kichi value achi na nahi,inputre re thiba url valid yt url ki nahi
-      //au chekc kala pare se url ru id extarct kariba
-      else {
+      if (trackId) {
+        socket?.emit("addtrack", {
+          track: trackId,
+          roomId: roomid,
+        });
+      } else {
         if (inputref.current?.value && validateUrl(inputref.current?.value)) {
-          const trackId = extractYoutubeId(inputref.current?.value);
+          const extractedId = extractYoutubeId(inputref.current?.value);
           socket?.emit("addtrack", {
-            track: trackId,
+            track: extractedId,
             roomId: roomid,
           });
           if (inputref.current) inputref.current.value = "";
+        } else {
+          setIsAddingTrack(false);
         }
       }
     });
   };
 
-  const upvote = (track: string) => {
+  const upvote = (trackId: string) => {
     requireAuth(() => {
-      socket?.emit("upvote", { track, roomid });
-      setvoted((prev) => [...prev, track]);
+      socket?.emit("upvote", { track: trackId, roomid });
+      setvoted((prev) => [...prev, trackId]);
     });
   };
 
-  const downvote = (trackName: string) => {
+  const downvote = (trackId: string) => {
     requireAuth(() => {
-      socket?.emit("downvote", { track: trackName, roomid });
-      setvoted((prev) => prev.filter((item) => item !== trackName));
+      socket?.emit("downvote", { track: trackId, roomid });
+      setvoted((prev) => prev.filter((item) => item !== trackId));
     });
   };
 
   const updatetracks = (updatedtracks: track[]) => {
-    console.log(updatedtracks);
+    setIsAddingTrack(false);
     settracks(updatedtracks);
   };
 
@@ -140,12 +143,17 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
     socket.emit("joinroom", roomid);
     socket.on("newuser", newUserHandler);
     socket.on("queue_updated", updatetracks);
+    socket.on("track_error", () => {
+      setIsAddingTrack(false);
+      toast.error("Failed to add track");
+    });
 
     return () => {
       socket.off("newuser", newUserHandler);
       socket.off("queue_updated", updatetracks);
+      socket.off("track_error");
     };
-  }, [socket]);
+  }, [socket, roomid]);
 
   const ytSelectHandler = (tarckId: string) => {
     setsearchKeyword("");
@@ -230,27 +238,36 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
           </div>
         </div>
       </div>
-
-      <div className="w-full max-w-md space-y-3">
+      <div className="w-full max-w-3xl space-y-3 h-[800px] overflow-scroll">
         {tracks.length > 0 ? (
           tracks.map((track, index) => (
             <div
               key={index}
-              className="flex justify-between items-center bg-white p-4 rounded-lg shadow-md"
+              className="flex justify-between items-center bg-white p-3 rounded-lg shadow-md"
             >
-              <div className="font-medium text-gray-800">{track.name}</div>
-              <div className="flex items-center gap-2 text-gray-700">
+              <div className="flex items-center">
+                <img
+                  src={track.smallThumbnail}
+                  alt={track.title}
+                  className="h-16 w-28 object-cover rounded mr-3"
+                />
+                <div className="font-medium text-gray-800 line-clamp-2">
+                  {track.title}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-gray-700 ml-3">
                 <span className="font-bold">{track.votes}</span>
-                {voted.includes(track.name) ? (
+                {voted.includes(track.id) ? (
                   <button
-                    onClick={() => downvote(track.name)}
+                    onClick={() => downvote(track.id)}
                     className="p-1 rounded-full hover:bg-gray-100"
                   >
                     <ArrowBigDown className="text-red-500" />
                   </button>
                 ) : (
                   <button
-                    onClick={() => upvote(track.name)}
+                    onClick={() => upvote(track.id)}
                     className="p-1 rounded-full hover:bg-gray-100"
                   >
                     <ArrowBigUp className="text-green-500" />
@@ -262,6 +279,11 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
         ) : (
           <div className="text-center text-gray-500 py-8">
             No tracks added yet. Be the first to add one!
+          </div>
+        )}
+        {isAddingTrack && (
+          <div className="flex justify-center py-4">
+            <Loader className="animate-spin text-blue-600" size={30} />
           </div>
         )}
       </div>

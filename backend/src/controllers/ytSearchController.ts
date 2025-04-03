@@ -52,3 +52,63 @@ export const searchOnYoutubeByKeyword = async (
     }
   }
 };
+export const searchonYtById = async (trackId: string) => {
+  try {
+    if (!trackId) {
+      throw new Error("Track ID is required");
+    }
+
+    const videoDetails = await youtubesearchapi.GetVideoDetails(trackId);
+
+    if (!videoDetails) {
+      throw new Error("Failed to fetch video details");
+    }
+
+    let smallThumbnail = "";
+    let bigThumbnail = "";
+
+    if (
+      videoDetails.thumbnail &&
+      Array.isArray(videoDetails.thumbnail.thumbnails) &&
+      videoDetails.thumbnail.thumbnails.length > 0
+    ) {
+      const thumbnails = videoDetails.thumbnail.thumbnails;
+      bigThumbnail = thumbnails[thumbnails.length - 1]?.url || "";
+
+      smallThumbnail =
+        thumbnails.length > 1
+          ? thumbnails[thumbnails.length - 2]?.url || ""
+          : bigThumbnail;
+    }
+
+    const data = {
+      id: videoDetails.id || trackId,
+      title: videoDetails.title || "Unknown Title",
+      smallThumbnail,
+      bigThumbnail,
+    };
+
+    console.log(data);
+
+    return data;
+  } catch (err) {
+    if (err instanceof Error) {
+      console.error(
+        `Error fetching video details for ID ${trackId}: ${err.message}`
+      );
+    } else {
+      console.error(
+        `Unknown error fetching video details for ID ${trackId}`,
+        err
+      );
+    }
+    return {
+      id: trackId,
+      title: "Error fetching video",
+      smallThumbnail: "",
+      bigThumbnail: "",
+    };
+  }
+};
+
+// searchonYtById("Ue5bOpVswIo");
