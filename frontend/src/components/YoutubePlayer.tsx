@@ -1,3 +1,4 @@
+import useUserStore from '@/zustand/userStore';
 import React, { useEffect, useRef, useState } from 'react';
 import YouTubePlayer from 'youtube-player';
 
@@ -21,8 +22,10 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(({ currentTrack, 
   const currentVideoIdRef = useRef<string>(currentTrack.id);
   const videoEndedRef = useRef<boolean>(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const { userState } = useUserStore();
+  
+  const isAdmin = userState.role === "admin";
 
-  // Initialize YouTube player
   useEffect(() => {
     if (!playerElementRef.current) return;
     
@@ -35,9 +38,9 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(({ currentTrack, 
         modestbranding: 1,
         rel: 0,
         origin: window.location.origin,
-        controls:0,
-        disablekb: 1, 
-        fs: 0,     
+        controls: isAdmin ? 1 : 0,
+        disablekb: isAdmin ? 0 : 1, 
+        fs: isAdmin ? 1 : 0,     
         iv_load_policy: 3
       }
     });
@@ -45,7 +48,7 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(({ currentTrack, 
     playerRef.current.on('ready', () => setIsReady(true));
 
     playerRef.current.on('stateChange', (event: any) => {
-      if (event.data === 0) { // Video ended
+      if (event.data === 0) { 
         if (!videoEndedRef.current) {
           videoEndedRef.current = true;
           onVideoEnd();
@@ -58,14 +61,12 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(({ currentTrack, 
         playerRef.current.destroy();
       }
     };
-  }, []);
+  }, [isAdmin]);
 
-  // Reset ended flag when track changes
   useEffect(() => {
     videoEndedRef.current = false;
   }, [currentTrack.id]);
 
-  // Load new video when track changes
   useEffect(() => {
     if (!isReady) return;
     
@@ -88,7 +89,6 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(({ currentTrack, 
     return false;
   };
 
-  // Prevent context menu
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     return false;
@@ -98,16 +98,29 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(({ currentTrack, 
     <div className="w-full flex flex-col">
       <div className="aspect-video relative bg-black rounded-lg overflow-hidden shadow-lg">
         <div ref={playerElementRef} className="w-full h-full" />
-        <div 
-          ref={overlayRef}
-          className="absolute inset-0 z-10" 
-          onClick={handleOverlayClick}
-          onContextMenu={handleContextMenu}
-        />
+        
+        {!isAdmin && (
+          <div 
+            ref={overlayRef}
+            className="absolute inset-0 z-10" 
+            onClick={handleOverlayClick}
+            onContextMenu={handleContextMenu}
+          />
+        )}
       </div>
+      
       <div className="mt-3 bg-white p-3 rounded-lg shadow-md">
-        <p className="text-gray-500 text-sm">Now Playing:</p>
-        <p className="font-medium truncate">{currentTrack.title}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-gray-500 text-sm">Now Playing:</p>
+            <p className="font-medium truncate">{currentTrack.title}</p>
+          </div>
+          {isAdmin && (
+            <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-md">
+              Admin Controls Enabled
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

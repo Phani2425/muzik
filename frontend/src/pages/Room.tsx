@@ -10,6 +10,7 @@ import axios from "axios";
 import YtSearch from "@/components/YtSearch";
 import YoutubePlayer from "@/components/YoutubePlayer";
 import { extractYoutubeId } from "@/utils/utils";
+import useUserStore from "@/zustand/userStore";
 
 interface HomeProp {
   socket: Socket | null;
@@ -32,12 +33,13 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
   const [searchKeyword, setsearchKeyword] = useState("");
   const [isAddingTrack, setIsAddingTrack] = useState(false);
   const [currentPlayingTrackId, setCurrentPlayingTrackId] = useState<
     string | null
   >(null);
+  const { userState, setUserState } = useUserStore();
 
   const validateUrl = (url: string) => {
     const urlRegex =
@@ -55,16 +57,46 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   const handleVideoEnd = () => {
     if (tracks.length > 0) {
       setCurrentPlayingTrackId(tracks[0].id);
-      if (socket && currentPlayingTrackId) {
-        socket.emit("trackCompleted", {
-          track: currentPlayingTrackId,
-          roomId: roomid,
-        });
-      }
     } else {
       setCurrentPlayingTrackId(null);
     }
   };
+
+  useEffect(() => {
+    if (socket && currentPlayingTrackId) {
+      socket.emit("trackCompleted", {
+        track: currentPlayingTrackId,
+        roomId: roomid,
+      });
+    }
+  }, [currentPlayingTrackId]);
+
+  const checkAdmin = async () => {
+    if (!user) {
+      return;
+    }
+    const response = await axios.get(
+      `${import.meta.env.VITE_BACKEND_URL}/api/rooms/${roomid}/isadmin`
+    );
+    if (response && response.data.success) {
+      if (response.data.data == user?.id) {
+        const userObj = {
+          id: user.id,
+          role: "admin",
+        };
+        localStorage.setItem("user", JSON.stringify(userObj));
+        setUserState(userObj);
+      }
+    } else {
+      return;
+    }
+  };
+
+  useEffect(() => {
+    if (isSignedIn) {
+      checkAdmin();
+    }
+  }, []);
 
   useEffect(() => {
     if (tracks.length > 0 && !currentPlayingTrackId) {
