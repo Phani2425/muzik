@@ -35,7 +35,9 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   const { isSignedIn } = useUser();
   const [searchKeyword, setsearchKeyword] = useState("");
   const [isAddingTrack, setIsAddingTrack] = useState(false);
-  const [currentPlayingTrackId, setCurrentPlayingTrackId] = useState<string | null>(null);
+  const [currentPlayingTrackId, setCurrentPlayingTrackId] = useState<
+    string | null
+  >(null);
 
   const validateUrl = (url: string) => {
     const urlRegex =
@@ -53,12 +55,22 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   const handleVideoEnd = () => {
     if (tracks.length > 0) {
       setCurrentPlayingTrackId(tracks[0].id);
+      if (socket && currentPlayingTrackId) {
+        socket.emit("trackCompleted", {
+          track: currentPlayingTrackId,
+          roomId: roomid,
+        });
+      }
+    } else {
+      setCurrentPlayingTrackId(null);
     }
   };
-  
-  const handleTrackSelect = (trackId: string) => {
-    setCurrentPlayingTrackId(trackId);
-  };
+
+  useEffect(() => {
+    if (tracks.length > 0 && !currentPlayingTrackId) {
+      setCurrentPlayingTrackId(tracks[0].id);
+    }
+  }, [tracks]);
 
   const searchInYoutube = async () => {
     try {
@@ -84,7 +96,7 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   };
 
   useEffect(() => {
-    const timeOutid = setTimeout(searchInYoutube, 600);
+    const timeOutid = setTimeout(searchInYoutube, 700);
     return () => {
       clearTimeout(timeOutid);
     };
@@ -145,8 +157,23 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
     settracks(updatedtracks);
   };
 
+  const fetchInitialTracks = async () => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/rooms/${roomid}/tracks`
+      );
+      if (response.data.success) {
+        settracks(response.data.tracks);
+      }
+    } catch (error) {
+      console.error("Failed to fetch initial tracks:", error);
+    }
+  };
+
   useEffect(() => {
     if (!socket) return;
+
+    fetchInitialTracks();
 
     socket.emit("joinroom", roomid);
     socket.on("newuser", newUserHandler);
@@ -204,13 +231,27 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
       <div className="max-w-7xl mx-auto">
         <header className="mb-6 flex justify-between items-center">
           <h1 className="text-2xl font-bold">{message}</h1>
-          <div className="text-xl font-semibold text-blue-600">Room: {roomid}</div>
+          <div className="text-xl font-semibold text-blue-600">
+            Room: {roomid}
+          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
             {tracks.length > 0 ? (
-              <YoutubePlayer tracks={tracks} />
+              currentPlayingTrackId ? (
+                <YoutubePlayer
+                  currentTrack={
+                    tracks.find((t) => t.id === currentPlayingTrackId) ||
+                    tracks[0]
+                  }
+                  onVideoEnd={handleVideoEnd}
+                />
+              ) : (
+                <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
+                  <Loader size={40} className="animate-spin text-blue-500" />
+                </div>
+              )
             ) : (
               <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
                 <p className="text-gray-500">No tracks added yet</p>
@@ -262,7 +303,9 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
                     ))}
                   </div>
                 ) : searchKeyword ? (
-                  <p className="text-center text-gray-500 py-4">No results found</p>
+                  <p className="text-center text-gray-500 py-4">
+                    No results found
+                  </p>
                 ) : null}
               </div>
             </div>

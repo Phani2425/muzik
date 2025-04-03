@@ -17,4 +17,6 @@ const TrackSchema = new mongoose.Schema({
     }
 })
 
+TrackSchema.index({id:1});
+
 export default mongoose.model('Track',TrackSchema);

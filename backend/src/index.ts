@@ -9,6 +9,7 @@ import redis from './config/redisClient';
 import Room from './models/Room';
 import router from './routes/ytSearchRoutes';
 import { getQueue } from './utils/utils';
+import roomRoutes from './routes/roomRoutes';
 
 const app = express();
 app.use(express.json());
@@ -17,6 +18,7 @@ const server = createServer(app);
 const io = new Server(server, {cors: {origin: "*"}});
 
 app.use('/api',router);
+app.use('/api/rooms', roomRoutes);
 
 connectToDb();
 
@@ -65,6 +67,14 @@ io.on('connection', (socket) => {
         const queue = await getQueue(roomId);
         console.log('updated queue',queue);
         io.to(roomId).emit('queue_updated',queue);
+    });
+
+    socket.on('trackCompleted', async({ track, roomId }) => {
+      await redis.zrem(`room:${roomId}`, track);
+      
+      const queue = await getQueue(roomId);
+      
+      io.to(roomId).emit('queue_updated', queue);
     });
 
     socket.on('upvote',async({track,roomid}) => {
