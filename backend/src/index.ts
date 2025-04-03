@@ -63,7 +63,7 @@ io.on('connection', (socket) => {
           await redis.zadd(`room:${roomId}`,1,track);
         }
         const queue = await getQueue(roomId);
-        // console.log('updated queue',queue);
+        console.log('updated queue',queue);
         io.to(roomId).emit('queue_updated',queue);
     });
 

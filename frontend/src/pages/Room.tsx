@@ -8,6 +8,7 @@ import { Socket } from "socket.io-client";
 import { toast } from "sonner";
 import axios from "axios";
 import YtSearch from "@/components/YtSearch";
+import YoutubePlayer from "@/components/YoutubePlayer";
 import { extractYoutubeId } from "@/utils/utils";
 
 interface HomeProp {
@@ -34,18 +35,29 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   const { isSignedIn } = useUser();
   const [searchKeyword, setsearchKeyword] = useState("");
   const [isAddingTrack, setIsAddingTrack] = useState(false);
+  const [currentPlayingTrackId, setCurrentPlayingTrackId] = useState<string | null>(null);
 
   const validateUrl = (url: string) => {
     const urlRegex =
       /^(?:(?:https?:)?\/\/)?(?:www\.)?(?:m\.)?(?:youtu(?:be)?\.com\/(?:v\/|embed\/|watch(?:\/|\?v=))|youtu\.be\/)((?:\w|-){11})(?:\S+)?$/;
 
-    if (url.match(urlRegex)) {
+    if (!url.match(urlRegex)) {
       toast("Invalid URL used", {
         description: "Paste a valid Youtube Url to Proceed",
       });
       return;
     }
     return true;
+  };
+
+  const handleVideoEnd = () => {
+    if (tracks.length > 0) {
+      setCurrentPlayingTrackId(tracks[0].id);
+    }
+  };
+  
+  const handleTrackSelect = (trackId: string) => {
+    setCurrentPlayingTrackId(trackId);
   };
 
   const searchInYoutube = async () => {
@@ -59,7 +71,6 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
             keyword: query,
           }
         );
-        // console.log(response.data.data.items.slice(1));
         setSearchResults(response.data.data.items.slice(1) || []);
         setIsSearching(false);
       } else {
@@ -72,17 +83,14 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
     }
   };
 
-  //applying debounciing
   useEffect(() => {
-    const timeOutid = setTimeout(searchInYoutube, 1000);
-
+    const timeOutid = setTimeout(searchInYoutube, 600);
     return () => {
       clearTimeout(timeOutid);
     };
   }, [searchKeyword]);
 
   const newUserHandler = (message: string) => {
-    console.log(message);
     setmessage(message);
   };
 
@@ -162,7 +170,7 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-screen h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 p-4">
       {showSignInModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full">
@@ -183,7 +191,7 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
               You need to sign in to interact with tracks in this room
             </p>
             <div className="flex justify-center">
-              <SignInButton mode="modal" afterSignInUrl={window.location.href}>
+              <SignInButton mode="modal">
                 <Button className="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg">
                   Sign In
                 </Button>
@@ -193,99 +201,126 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
         </div>
       )}
 
-      <h1 className="text-2xl font-bold mb-6">{message}</h1>
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-6 flex justify-between items-center">
+          <h1 className="text-2xl font-bold">{message}</h1>
+          <div className="text-xl font-semibold text-blue-600">Room: {roomid}</div>
+        </header>
 
-      <div className="flex gap-4">
-        <div className="flex gap-3 items-center bg-white p-4 rounded-lg shadow-md mb-6 w-full max-w-md">
-          <Input
-            placeholder="Enter track name or ID"
-            name="trackInput"
-            ref={inputref}
-            className="flex-grow focus:ring-blue-500"
-          />
-          <Button
-            onClick={() => addtrack()}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            Add Track
-          </Button>
-        </div>
-
-        <div className="flex flex-col gap-3 items-center bg-white p-4 rounded-lg shadow-md mb-6 w-full max-w-md">
-          <Input
-            placeholder="Search videos on Youtube"
-            name="searchInput"
-            className="flex-grow focus:ring-blue-500"
-            onChange={(e) => setsearchKeyword(e.target.value)}
-            value={searchKeyword}
-          />
-          <div className="flex flex-col gap-1">
-            {isSearching ? (
-              <Loader size={25} className="animate-spin" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            {tracks.length > 0 ? (
+              <YoutubePlayer tracks={tracks} />
             ) : (
-              searchResults.length > 0 && (
-                <div className="flex flex-col gap-2 overflow-y-scroll h-[300px] w-[450px]">
-                  {searchResults.map((result, index) => (
-                    <YtSearch
-                      onSelect={ytSelectHandler}
-                      key={index}
-                      data={result}
-                    />
-                  ))}
-                </div>
-              )
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="w-full max-w-3xl space-y-3 h-[800px] overflow-scroll">
-        {tracks.length > 0 ? (
-          tracks.map((track, index) => (
-            <div
-              key={index}
-              className="flex justify-between items-center bg-white p-3 rounded-lg shadow-md"
-            >
-              <div className="flex items-center">
-                <img
-                  src={track.smallThumbnail}
-                  alt={track.title}
-                  className="h-16 w-28 object-cover rounded mr-3"
-                />
-                <div className="font-medium text-gray-800 line-clamp-2">
-                  {track.title}
-                </div>
+              <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
+                <p className="text-gray-500">No tracks added yet</p>
               </div>
+            )}
 
-              <div className="flex items-center gap-2 text-gray-700 ml-3">
-                <span className="font-bold">{track.votes}</span>
-                {voted.includes(track.id) ? (
-                  <button
-                    onClick={() => downvote(track.id)}
-                    className="p-1 rounded-full hover:bg-gray-100"
-                  >
-                    <ArrowBigDown className="text-red-500" />
-                  </button>
+            <div className="bg-white p-4 rounded-lg shadow-md">
+              <h2 className="font-semibold text-lg mb-3">Add Track</h2>
+              <div className="flex gap-3">
+                <Input
+                  placeholder="Enter YouTube URL"
+                  name="trackInput"
+                  ref={inputref}
+                  className="flex-grow focus:ring-blue-500"
+                />
+                <Button
+                  onClick={() => addtrack()}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded-lg shadow-md">
+              <h2 className="font-semibold text-lg mb-3">Search YouTube</h2>
+              <Input
+                placeholder="Search videos"
+                name="searchInput"
+                className="w-full mb-1"
+                onChange={(e) => setsearchKeyword(e.target.value)}
+                value={searchKeyword}
+              />
+              <div className="h-[150px] overflow-y-auto">
+                {isSearching ? (
+                  <div className="flex justify-center py-4">
+                    <Loader size={25} className="animate-spin" />
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  <div className="space-y-2">
+                    {searchResults.map((result, index) => (
+                      <YtSearch
+                        onSelect={ytSelectHandler}
+                        key={index}
+                        data={result}
+                      />
+                    ))}
+                  </div>
+                ) : searchKeyword ? (
+                  <p className="text-center text-gray-500 py-4">No results found</p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-lg shadow-md">
+              <h2 className="font-semibold text-lg mb-3">Queue</h2>
+              <div className="h-[300px] overflow-y-auto space-y-2">
+                {tracks.length > 0 ? (
+                  tracks.map((track, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center p-2 hover:bg-gray-50 rounded"
+                    >
+                      <div className="flex items-center">
+                        <img
+                          src={track.smallThumbnail}
+                          alt={track.title}
+                          className="h-12 w-20 object-cover rounded mr-2"
+                        />
+                        <div className="text-sm line-clamp-2 max-w-[180px]">
+                          {track.title}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 ml-2">
+                        <span className="font-bold text-sm">{track.votes}</span>
+                        {voted.includes(track.id) ? (
+                          <button
+                            onClick={() => downvote(track.id)}
+                            className="p-1 rounded-full hover:bg-gray-200"
+                          >
+                            <ArrowBigDown className="text-red-500 h-5 w-5" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => upvote(track.id)}
+                            className="p-1 rounded-full hover:bg-gray-200"
+                          >
+                            <ArrowBigUp className="text-green-500 h-5 w-5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
                 ) : (
-                  <button
-                    onClick={() => upvote(track.id)}
-                    className="p-1 rounded-full hover:bg-gray-100"
-                  >
-                    <ArrowBigUp className="text-green-500" />
-                  </button>
+                  <div className="text-center text-gray-500 py-4">
+                    Queue is empty
+                  </div>
+                )}
+                {isAddingTrack && (
+                  <div className="flex justify-center py-4">
+                    <Loader className="animate-spin text-blue-600" size={20} />
+                  </div>
                 )}
               </div>
             </div>
-          ))
-        ) : (
-          <div className="text-center text-gray-500 py-8">
-            No tracks added yet. Be the first to add one!
           </div>
-        )}
-        {isAddingTrack && (
-          <div className="flex justify-center py-4">
-            <Loader className="animate-spin text-blue-600" size={30} />
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
