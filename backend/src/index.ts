@@ -7,11 +7,15 @@ import { Server } from 'socket.io';
 import { connectToDb } from './config/db';
 import redis from './config/redisClient';
 import Room from './models/Room';
+import router from './routes/ytSearchRoutes';
 
 const app = express();
+app.use(express.json());
 app.use(cors({}));
 const server = createServer(app);
 const io = new Server(server, {cors: {origin: "*"}});
+
+app.use('/api',router);
 
 const getQueue = async (roomId:string) => {
     const key = `room:${roomId}`;
@@ -94,6 +98,7 @@ io.on('connection', (socket) => {
 app.use('/', (req,resp) => {
     resp.send('server is up and running');
 })
+
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, ()=>{

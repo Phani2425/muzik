@@ -16,6 +16,15 @@ const RoomSchema = new mongoose.Schema({
       required: true
     }
   },
+  tracks:{
+    type:[
+      {
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"Track"
+      }
+    ],
+    default:[]
+  },
   createdAt: {
     type: Date,
     default: Date.now
