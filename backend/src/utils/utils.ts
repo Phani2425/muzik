@@ -1,6 +1,7 @@
 import redis from "../config/redisClient";
 import Track from "../models/Track";
 import { searchonYtById } from "../controllers/ytSearchController";
+import { multiplier } from "./constants";
 
 export const getQueue = async (roomId: string) => {
     const key = `room:${roomId}`;
@@ -18,7 +19,10 @@ export const getQueue = async (roomId: string) => {
     // Extract IDs and votes while recording original positions
     for (let i = 0; i < trackList.length; i += 2) {
       const trackId = trackList[i];
-      const voteCount = parseInt(trackList[i + 1]);
+      const scoreStr = trackList[i + 1];
+      const score = parseInt(scoreStr);
+      
+      const voteCount = Math.floor(score / multiplier);
       const position = i / 2;
       
       trackIds.push(trackId);

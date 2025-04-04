@@ -147,7 +147,7 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   };
 
   useEffect(() => {
-    const timeOutid = setTimeout(searchInYoutube, 300);
+    const timeOutid = setTimeout(searchInYoutube, 500);
     return () => {
       clearTimeout(timeOutid);
     };

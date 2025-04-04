@@ -138,7 +138,6 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(
       }
     }, [isReady, isAdmin, handleSeekChange]);
 
-    // Listen for control updates from admin
     useEffect(() => {
       if (!socket || isAdmin) return;
 
@@ -164,7 +163,6 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(
         }
       };
 
-      // Handle seek events
       const handleSeekUpdate = (data: { timestamp: number }) => {
         if (!playerRef.current || !isReady) return;
 
@@ -208,7 +206,6 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(
       if (isAdmin) {
         videoEndedRef.current = true;
 
-        // Notify other users that admin has skipped this track
         if (socket) {
           socket.emit("skipTrack", roomId);
         }
@@ -217,7 +214,6 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(
       }
     }, [isAdmin, onVideoEnd, socket, roomId]);
 
-    // Prevent non-admin interactions
     const handleOverlayClick = (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -271,7 +267,6 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(
       </div>
     );
   },
-  // Add this comparison function to prevent unnecessary re-renders
   (prevProps, nextProps) => {
     // Only re-render if the track ID changes
     return (

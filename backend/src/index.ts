@@ -10,6 +10,7 @@ import Room from "./models/Room";
 import router from "./routes/ytSearchRoutes";
 import { getQueue } from "./utils/utils";
 import roomRoutes from "./routes/roomRoutes";
+import { max_timestamp, multiplier } from "./utils/constants";
 
 const app = express();
 app.use(express.json());
@@ -79,12 +80,17 @@ io.on("connection", (socket) => {
     //if the track already exist in the set then increase its vote else add it
     const score = await redis.zscore(`room:${roomId}`, track);
     if (score) {
-      await redis.zincrby(`room:${roomId}`, 1, track);
+      const intScore = parseInt(score);
+      const votes = intScore/multiplier;
+      const timesatmp = intScore % multiplier;
+      const newScore = (votes + 1 )*multiplier + timesatmp;
+      await redis.zadd(`room:${roomId}`, newScore, track);
     } else {
-      await redis.zadd(`room:${roomId}`, 1, track);
+      const newScore = 1*multiplier + (max_timestamp - Math.floor(Date.now() / 1000));
+      await redis.zadd(`room:${roomId}`, newScore, track);
     }
     const queue = await getQueue(roomId);
-    console.log("updated queue", queue);
+    // console.log("updated queue", queue);
     io.to(roomId).emit("queue_updated", queue);
   });
 
@@ -98,15 +104,24 @@ io.on("connection", (socket) => {
 
   socket.on("upvote", async ({ track, roomid }) => {
     //increase the votes of the track
-    await redis.zincrby(`room:${roomid}`, 1, track);
+    const score = await redis.zscore(`room:${roomid}`, track);
+    const intScore = parseInt(score!);
+    const votes = intScore/multiplier;
+    const timesatmp = intScore % multiplier;
+    const newScore = (votes + 1 )*multiplier + timesatmp;
+    await redis.zadd(`room:${roomid}`, newScore, track);
     const queue = await getQueue(roomid);
     io.to(roomid).emit("queue_updated", queue);
     io.to(roomid).emit("track_removed");
   });
 
   socket.on("downvote", async ({ track, roomid }) => {
-    // decrease the vote of the track
-    await redis.zincrby(`room:${roomid}`, -1, track);
+    const score = await redis.zscore(`room:${roomid}`, track);
+    const intScore = parseInt(score!);
+    const votes = intScore/multiplier;
+    const timesatmp = intScore % multiplier;
+    const newScore = (votes - 1 )*multiplier + timesatmp;
+    await redis.zadd(`room:${roomid}`, newScore, track);
     const queue = await getQueue(roomid);
     io.to(roomid).emit("queue_updated", queue);
   });
