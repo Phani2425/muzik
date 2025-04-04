@@ -2,8 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SignInButton, useUser } from "@clerk/clerk-react";
 import { ArrowBigDown, ArrowBigUp, Loader, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Socket } from "socket.io-client";
 import { toast } from "sonner";
 import axios from "axios";
@@ -40,6 +40,16 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
     string | null
   >(null);
   const { userState, setUserState } = useUserStore();
+  const navigate = useNavigate();
+
+  const resetUserRole = useCallback(() => {
+    localStorage.removeItem("user");
+
+    setUserState({
+      id: "",
+      role: "user",
+    });
+  }, [setUserState]);
 
   const validateUrl = (url: string) => {
     const urlRegex =
@@ -202,6 +212,21 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
     }
   };
 
+  const handleNoRoom = (message: string) => {
+    console.log(message);
+    resetUserRole();
+    toast("Sorry! this room don't exist anymore", {
+      description: "Create your own Room. It's Free... 😉",
+    });
+    navigate(-1);
+  };
+
+  const handleSpaceEnded = (message: string) => {
+    resetUserRole();
+    navigate(-1);
+    toast(message);
+  };
+
   useEffect(() => {
     if (!socket) return;
 
@@ -214,11 +239,21 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
       setIsAddingTrack(false);
       toast.error("Failed to add track");
     });
+    socket.on("no_room", handleNoRoom);
+    socket.on("space_ended", handleSpaceEnded);
+    socket.on("track_skipped", () => {
+      toast("Current Track Skipped by Creator", {
+        description: "ye kaisa dictatorship hai bhai..🙄",
+      });
+    });
 
     return () => {
       socket.off("newuser", newUserHandler);
       socket.off("queue_updated", updatetracks);
       socket.off("track_error");
+      socket.off("no_room", handleNoRoom);
+      socket.off("space_ended", handleSpaceEnded);
+      resetUserRole();
     };
   }, [socket, roomid]);
 
@@ -226,6 +261,14 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
     setsearchKeyword("");
     setSearchResults([]);
     addtrack(tarckId);
+  };
+
+  const handleEndSpace = () => {
+    if (userState.role == "admin") {
+      resetUserRole();
+      socket?.emit("end_space", roomid);
+    }
+    return;
   };
 
   return (
@@ -278,6 +321,8 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
                     tracks[0]
                   }
                   onVideoEnd={handleVideoEnd}
+                  socket={socket}
+                  roomId={roomid || ""}
                 />
               ) : (
                 <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
@@ -397,6 +442,12 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
           </div>
         </div>
       </div>
+
+      {isSignedIn && user && userState.role == "admin" && (
+        <div className="w-20 mx-auto ">
+          <Button onClick={handleEndSpace}>End Space</Button>
+        </div>
+      )}
     </div>
   );
 };
