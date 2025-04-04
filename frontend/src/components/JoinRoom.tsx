@@ -1,10 +1,11 @@
 import { Input } from "@/components/ui/input";
 import { SignInButton, useUser } from "@clerk/clerk-react";
-import { Copy } from "lucide-react";
-import { useRef, useState } from "react";
+import { Copy, Loader2 } from "lucide-react";
+import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Socket } from "socket.io-client";
 import { Button } from "./ui/button";
+import { toast } from "sonner";
 
 interface JoinRoomProps {
   socket: Socket | null;
@@ -16,9 +17,11 @@ const JoinRoom = ({ socket }: JoinRoomProps) => {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const navigate = useNavigate();
   const { isSignedIn, user } = useUser();
+  const [creatingRoom, setcreatingRoom] = useState<boolean>(false);
 
   const createRoom = () => {
     // Check if user is signed in
+    setcreatingRoom(true);
     if (!isSignedIn) {
       setShowSignInModal(true);
       return;
@@ -31,8 +34,6 @@ const JoinRoom = ({ socket }: JoinRoomProps) => {
         userName: user?.fullName || user?.username,
       });
     }
-
-    joinRoom();
   };
 
   const createRoomId = () => {
@@ -54,6 +55,29 @@ const JoinRoom = ({ socket }: JoinRoomProps) => {
   const joinRoom = () => {
     navigate(`/room/${roomId}`);
   };
+
+  useEffect(() => {
+    if (!socket) return;
+    
+    socket?.on("roomCreated", () => {
+      setcreatingRoom(false);
+      toast("Room creation successfull", {
+        description: "Enjoy jamming and streaming..🤗",
+      });
+      joinRoom();
+    });
+    socket?.on("roomCreationFailed", () => {
+      setcreatingRoom(false);
+      toast("failed to create Room", {
+        description: "try again with different code",
+      });
+    });
+
+    return () => {
+      socket?.off("roomCreated");
+      socket?.off("roomCreationFailed");
+    };
+  }, [socket,roomId]);
 
   return (
     <div className="flex flex-col gap-6 h-screen w-screen justify-center items-center">
@@ -106,8 +130,16 @@ const JoinRoom = ({ socket }: JoinRoomProps) => {
           Generate Room Id
         </Button>
       </div>
-      <Button onClick={createRoom} className="w-xs px-3 py-4">
-        Create Room
+      <Button
+        onClick={createRoom}
+        disabled={creatingRoom}
+        className="w-xs px-3 py-4"
+      >
+        {creatingRoom ? (
+          <Loader2 size={23} className="animate-spin" />
+        ) : (
+          <span>Create Room</span>
+        )}
       </Button>
       <div className="flex items-center gap-3">
         <Input

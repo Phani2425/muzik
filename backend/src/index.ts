@@ -42,13 +42,10 @@ io.on("connection", (socket) => {
       await room.save();
 
       console.log(`Room ${roomId} created with admin ${userName}`);
-      socket.emit("roomCreated", { success: true, roomId });
+      socket.emit("roomCreated", roomId);
     } catch (error) {
       console.error("Error creating room:", error);
-      socket.emit("roomCreated", {
-        success: false,
-        error: "Failed to create room",
-      });
+      socket.emit("roomCreationFailed");
     }
   });
 
@@ -104,6 +101,7 @@ io.on("connection", (socket) => {
     await redis.zincrby(`room:${roomid}`, 1, track);
     const queue = await getQueue(roomid);
     io.to(roomid).emit("queue_updated", queue);
+    io.to(roomid).emit("track_removed");
   });
 
   socket.on("downvote", async ({ track, roomid }) => {

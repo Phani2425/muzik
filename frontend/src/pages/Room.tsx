@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SignInButton, useUser } from "@clerk/clerk-react";
-import { ArrowBigDown, ArrowBigUp, Loader, X } from "lucide-react";
+import { ArrowBigDown, ArrowBigUp, Loader, Music2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Socket } from "socket.io-client";
@@ -36,9 +36,9 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   const { isSignedIn, user } = useUser();
   const [searchKeyword, setsearchKeyword] = useState("");
   const [isAddingTrack, setIsAddingTrack] = useState(false);
-  const [currentPlayingTrackId, setCurrentPlayingTrackId] = useState<
-    string | null
-  >(null);
+  const [currentPlayingTrack, setCurrentPlayingTrack] = useState<track | null>(
+    null
+  );
   const { userState, setUserState } = useUserStore();
   const navigate = useNavigate();
 
@@ -64,22 +64,22 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
     return true;
   };
 
-  const handleVideoEnd = () => {
-    if (tracks.length > 0) {
-      setCurrentPlayingTrackId(tracks[0].id);
-    } else {
-      setCurrentPlayingTrackId(null);
-    }
-  };
-
-  useEffect(() => {
-    if (socket && currentPlayingTrackId) {
+  const handleVideoEnd = useCallback(() => {
+    if (socket && currentPlayingTrack) {
+      const nextTrack = tracks.length > 1 ? tracks[1] : null;
+      
       socket.emit("trackCompleted", {
-        track: currentPlayingTrackId,
+        track: currentPlayingTrack.id,
         roomId: roomid,
       });
+      
+      if (nextTrack) {
+        setCurrentPlayingTrack(nextTrack);
+      } else {
+        setCurrentPlayingTrack(null);
+      }
     }
-  }, [currentPlayingTrackId]);
+  }, [socket, currentPlayingTrack, tracks, roomid]);
 
   const checkAdmin = async () => {
     if (!user) {
@@ -109,13 +109,18 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   }, []);
 
   useEffect(() => {
-    if (tracks.length > 0 && !currentPlayingTrackId) {
-      setCurrentPlayingTrackId(tracks[0].id);
+    if (tracks.length > 0 && !currentPlayingTrack) {
+      setCurrentPlayingTrack(tracks[0]);
+    } else {
+      return;
     }
   }, [tracks]);
 
   const searchInYoutube = async () => {
     try {
+      if (searchKeyword.length == 0) {
+        return;
+      }
       const query = searchKeyword.trim();
       if (query.length > 0) {
         setIsSearching(true);
@@ -128,17 +133,21 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
         setSearchResults(response.data.data.items.slice(1) || []);
         setIsSearching(false);
       } else {
+        toast("Enter something to search on youtube");
         return;
       }
     } catch (err) {
       setIsSearching(false);
+      toast.error("couldn't fetch results from youtube", {
+        description: "sorry for inconvinience..😔",
+      });
       console.error("Error searching YouTube:", err);
       toast.error("Failed to search YouTube");
     }
   };
 
   useEffect(() => {
-    const timeOutid = setTimeout(searchInYoutube, 700);
+    const timeOutid = setTimeout(searchInYoutube, 300);
     return () => {
       clearTimeout(timeOutid);
     };
@@ -314,12 +323,9 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
             {tracks.length > 0 ? (
-              currentPlayingTrackId ? (
+              currentPlayingTrack ? (
                 <YoutubePlayer
-                  currentTrack={
-                    tracks.find((t) => t.id === currentPlayingTrackId) ||
-                    tracks[0]
-                  }
+                  currentTrack={currentPlayingTrack}
                   onVideoEnd={handleVideoEnd}
                   socket={socket}
                   roomId={roomid || ""}
@@ -394,7 +400,7 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
                   tracks.map((track, index) => (
                     <div
                       key={index}
-                      className="flex justify-between items-center p-2 hover:bg-gray-50 rounded"
+                      className="flex justify-between items-center p-2 hover:bg-gray-50 rounded relative"
                     >
                       <div className="flex items-center">
                         <img
@@ -425,6 +431,14 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
                           </button>
                         )}
                       </div>
+                      {track.id == currentPlayingTrack?.id && (
+                        <div className="w-full bg-gray-600/45 backdrop-blur-xs flex items-center justify-center gap-2 absolute inset-0 ">
+                          <Music2 size={22} className=" text-white " />
+                          <span className="text-white font-semibold">
+                            Now Playing
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ))
                 ) : (
