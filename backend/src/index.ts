@@ -8,7 +8,7 @@ import { connectToDb } from "./config/db";
 import redis from "./config/redisClient";
 import Room from "./models/Room";
 import router from "./routes/ytSearchRoutes";
-import { getQueue } from "./utils/utils";
+import { getQueue, putCurrTrackToTop } from "./utils/utils";
 import roomRoutes from "./routes/roomRoutes";
 import { max_timestamp, multiplier } from "./utils/constants";
 
@@ -81,12 +81,13 @@ io.on("connection", (socket) => {
     const score = await redis.zscore(`room:${roomId}`, track);
     if (score) {
       const intScore = parseInt(score);
-      const votes = intScore/multiplier;
+      const votes = Math.round(intScore / multiplier);
       const timesatmp = intScore % multiplier;
-      const newScore = (votes + 1 )*multiplier + timesatmp;
+      const newScore = (votes + 1) * multiplier + timesatmp;
       await redis.zadd(`room:${roomId}`, newScore, track);
     } else {
-      const newScore = 1*multiplier + (max_timestamp - Math.floor(Date.now() / 1000));
+      const newScore =
+        1 * multiplier + (max_timestamp - Math.floor(Date.now() / 1000));
       await redis.zadd(`room:${roomId}`, newScore, track);
     }
     const queue = await getQueue(roomId);
@@ -106,9 +107,9 @@ io.on("connection", (socket) => {
     //increase the votes of the track
     const score = await redis.zscore(`room:${roomid}`, track);
     const intScore = parseInt(score!);
-    const votes = intScore/multiplier;
+    const votes = Math.round(intScore / multiplier);
     const timesatmp = intScore % multiplier;
-    const newScore = (votes + 1 )*multiplier + timesatmp;
+    const newScore = (votes + 1) * multiplier + timesatmp;
     await redis.zadd(`room:${roomid}`, newScore, track);
     const queue = await getQueue(roomid);
     io.to(roomid).emit("queue_updated", queue);
@@ -118,9 +119,9 @@ io.on("connection", (socket) => {
   socket.on("downvote", async ({ track, roomid }) => {
     const score = await redis.zscore(`room:${roomid}`, track);
     const intScore = parseInt(score!);
-    const votes = intScore/multiplier;
+    const votes = Math.round(intScore / multiplier);
     const timesatmp = intScore % multiplier;
-    const newScore = (votes - 1 )*multiplier + timesatmp;
+    const newScore = Math.max(0, votes - 1) * multiplier + timesatmp;
     await redis.zadd(`room:${roomid}`, newScore, track);
     const queue = await getQueue(roomid);
     io.to(roomid).emit("queue_updated", queue);
@@ -142,8 +143,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("skipTrack", (roomId) => {
-    socket.to(roomId).emit('track_skipped');
-  })
+    socket.to(roomId).emit("track_skipped");
+  });
 
   socket.on("end_space", async (roomId) => {
     try {
@@ -170,6 +171,33 @@ io.on("connection", (socket) => {
     } catch (err) {
       console.log("error occured while ending space", err);
     }
+  });
+
+  socket.on("savePlayerState", async (playerState) => {
+    const key = `room:${playerState.roomId}:currTrack`;
+
+    const prevStateStr = await redis.hget(key, "currentTrack");
+
+    if (prevStateStr) {
+      try {
+        const prevState = JSON.parse(prevStateStr);
+
+        if (prevState.currTrack !== playerState.currTrack) {
+          await putCurrTrackToTop(playerState);
+
+          const queue = await getQueue(playerState.roomId);
+          io.to(playerState.roomId).emit("queue_updated", queue);
+        }
+      } catch (err) {
+        console.error("Error parsing previous state:", err);
+      }
+    } else {
+      await putCurrTrackToTop(playerState);
+      const queue = await getQueue(playerState.roomId);
+      io.to(playerState.roomId).emit("queue_updated", queue);
+    }
+
+    await redis.hset(key, "currentTrack", JSON.stringify(playerState));
   });
 
   socket.on("disconnect", () => {

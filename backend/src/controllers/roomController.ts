@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { getQueue } from "../utils/utils";
 import Room from "../models/Room";
+import redis from "../config/redisClient";
 
 export const getRoomTracks = async (req: Request, res: Response) => {
   try {
@@ -14,11 +15,18 @@ export const getRoomTracks = async (req: Request, res: Response) => {
     }
 
     const tracks = await getQueue(roomId);
+    let currPlyerState = null;
+    //getting the current player state
+    const result = await redis.hexists(`room:${roomId}:currTrack`,"currentTrack");
+    if(result){
+      currPlyerState = JSON.parse(await redis.hget(`room:${roomId}:currTrack`, "currentTrack") as string); 
+    }
 
     return res.status(200).json({
       success: true,
       message: "Tracks fetched successfully",
       tracks,
+      currPlyerState
     });
   } catch (error) {
     console.error("Error fetching room tracks:", error);

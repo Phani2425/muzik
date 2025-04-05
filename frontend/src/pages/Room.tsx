@@ -11,6 +11,7 @@ import YtSearch from "@/components/YtSearch";
 import YoutubePlayer from "@/components/YoutubePlayer";
 import { extractYoutubeId } from "@/utils/utils";
 import useUserStore from "@/zustand/userStore";
+import { CurrentPlayerState } from "@/utils/types";
 
 interface HomeProp {
   socket: Socket | null;
@@ -41,6 +42,8 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   );
   const { userState, setUserState } = useUserStore();
   const navigate = useNavigate();
+  const [currentPlayerState, setcurrentPlayerState] =
+    useState<CurrentPlayerState | null>(null);
 
   const resetUserRole = useCallback(() => {
     localStorage.removeItem("user");
@@ -67,12 +70,12 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   const handleVideoEnd = useCallback(() => {
     if (socket && currentPlayingTrack) {
       const nextTrack = tracks.length > 1 ? tracks[1] : null;
-      
+
       socket.emit("trackCompleted", {
         track: currentPlayingTrack.id,
         roomId: roomid,
       });
-      
+
       if (nextTrack) {
         setCurrentPlayingTrack(nextTrack);
       } else {
@@ -215,6 +218,7 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
       );
       if (response.data.success) {
         settracks(response.data.tracks);
+        setcurrentPlayerState(response.data.currPlyerState);
       }
     } catch (error) {
       console.error("Failed to fetch initial tracks:", error);
@@ -329,6 +333,8 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
                   onVideoEnd={handleVideoEnd}
                   socket={socket}
                   roomId={roomid || ""}
+                  currentPlayerState={currentPlayerState}
+                  setcurrentPlyerState={setcurrentPlayerState}
                 />
               ) : (
                 <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">

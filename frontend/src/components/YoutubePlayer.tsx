@@ -1,27 +1,19 @@
+import { YoutubePlayerProps } from "@/utils/types";
 import useUserStore from "@/zustand/userStore";
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import YouTubePlayer from "youtube-player";
-import { Socket } from "socket.io-client";
 import { debounce } from "lodash";
 import { SkipForward } from "lucide-react";
-
-interface Track {
-  id: string;
-  title: string;
-  smallThumbnail: string;
-  bigThumbnail: string;
-  votes: number;
-}
-
-interface YoutubePlayerProps {
-  currentTrack: Track;
-  onVideoEnd: () => void;
-  socket: Socket | null;
-  roomId: string;
-}
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import YouTubePlayer from "youtube-player";
 
 const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(
-  ({ currentTrack, onVideoEnd, socket, roomId }) => {
+  ({
+    currentTrack,
+    onVideoEnd,
+    socket,
+    roomId,
+    currentPlayerState,
+    setcurrentPlyerState,
+  }) => {
     const [isReady, setIsReady] = useState(false);
     const playerRef = useRef<any>(null);
     const playerElementRef = useRef<HTMLDivElement>(null);
@@ -86,10 +78,29 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(
           controls: isAdmin ? 1 : 0,
           disablekb: isAdmin ? 0 : 1,
           fs: isAdmin ? 1 : 0,
+          playsinline: 1,
         },
       });
 
-      playerRef.current.on("ready", () => setIsReady(true));
+      playerRef.current.on("ready", () => {
+        setIsReady(true);
+
+        // If we have a stored player state with timestamp, seek to it
+        if (currentPlayerState && currentPlayerState.timeStamp) {
+          // Calculate time offset since last update
+          const lastUpdateTime = currentPlayerState.lastUpdated || Date.now();
+          const elapsedTime = (Date.now() - lastUpdateTime) / 1000; // in seconds
+
+          // Add elapsed time to the stored timestamp for more accuracy
+          const targetTime = currentPlayerState.timeStamp + elapsedTime;
+
+          // Seek to the target time
+          playerRef.current.seekTo(targetTime + 1);
+
+          playerRef.current.playVideo();
+          setcurrentPlyerState(null);
+        }
+      });
       playerRef.current.on("stateChange", handlePlayerStateChange);
 
       return () => {
@@ -98,6 +109,38 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(
         }
       };
     }, [isAdmin, handlePlayerStateChange]);
+
+    const emitPlayerState = () => {
+      if (!isAdmin || !socket) return;
+      playerRef.current
+        .getCurrentTime()
+        .then((currentTime: number) => {
+          const playerState = {
+            roomId,
+            currTrack: currentTrack.id,
+            timeStamp: currentTime,
+            lastUpdated: Date.now(),
+          };
+
+          socket.emit("savePlayerState", playerState);
+        })
+        .catch((err: Error) => {
+          console.error("Error getting current time:", err);
+        });
+    };
+
+    //setting up the setinterval for sending the cuurrent track along with the curretnt timestamp for synchronsing the new users
+    useEffect(() => {
+      if (!isAdmin) return;
+
+      const intervalId = setInterval(() => {
+        emitPlayerState();
+      }, 1000);
+
+      return () => {
+        clearInterval(intervalId);
+      };
+    }, [isReady, isAdmin, socket, roomId]);
 
     // Handle seek events from admin
     const debouncedSeekEmit = useRef(
@@ -108,14 +151,12 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(
             roomId,
           });
         }
-      }, 200) // 200ms delay
+      }, 200)
     ).current;
 
-    // Then modify the handleSeekChange function:
     const handleSeekChange = useCallback(
       (e: any) => {
         if (isAdmin && socket && isReady) {
-          // Get current time from player
           playerRef.current.getCurrentTime().then((currentTime: number) => {
             // Use the debounced function
             debouncedSeekEmit(currentTime);
@@ -272,7 +313,8 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = React.memo(
     return (
       prevProps.currentTrack.id === nextProps.currentTrack.id &&
       prevProps.socket === nextProps.socket &&
-      prevProps.roomId === prevProps.roomId
+      prevProps.roomId === prevProps.roomId &&
+      prevProps.currentPlayerState === nextProps.currentPlayerState
     );
   }
 );
