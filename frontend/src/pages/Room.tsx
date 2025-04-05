@@ -1,7 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SignInButton, useUser } from "@clerk/clerk-react";
-import { ArrowBigDown, ArrowBigUp, Loader, Music2, X } from "lucide-react";
+import {
+  ArrowBigDown,
+  ArrowBigUp,
+  Copy,
+  Loader,
+  Music2,
+  Share2Icon,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Socket } from "socket.io-client";
@@ -12,6 +20,7 @@ import YoutubePlayer from "@/components/YoutubePlayer";
 import { extractYoutubeId } from "@/utils/utils";
 import useUserStore from "@/zustand/userStore";
 import { CurrentPlayerState } from "@/utils/types";
+import ShareModal from "@/components/ShareModal";
 
 interface HomeProp {
   socket: Socket | null;
@@ -44,6 +53,8 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
   const navigate = useNavigate();
   const [currentPlayerState, setcurrentPlayerState] =
     useState<CurrentPlayerState | null>(null);
+  const [roomCodeCopied, setroomCodeCopied] = useState<boolean>(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const resetUserRole = useCallback(() => {
     localStorage.removeItem("user");
@@ -284,6 +295,16 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
     return;
   };
 
+  const shareHandler = () => {
+    setShareModalOpen(true);
+  };
+
+  const copyHandler = () => {
+    navigator.clipboard.writeText(roomid!);
+    setroomCodeCopied(true);
+    setTimeout(() => setroomCodeCopied(false), 2000);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       {showSignInModal && (
@@ -319,8 +340,19 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
       <div className="max-w-7xl mx-auto">
         <header className="mb-6 flex justify-between items-center">
           <h1 className="text-2xl font-bold">{message}</h1>
-          <div className="text-xl font-semibold text-blue-600">
-            Room: {roomid}
+          <div className="flex items-center gap-3">
+            <button
+              className="border-[1px] rounded-sm border-black flex px-2 py-1 gap-2 cursor-pointer"
+              onClick={copyHandler}
+            >
+              <span className="text-xs text-gray-700">
+                {roomCodeCopied ? "copied" : "copy code"}
+              </span>
+              {!roomCodeCopied && <Copy size={16} />}
+            </button>
+            <button onClick={shareHandler} className="cursor-pointer">
+              <Share2Icon size={24} className="font-semibold" />
+            </button>
           </div>
         </header>
 
@@ -468,6 +500,14 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
           <Button onClick={handleEndSpace}>End Space</Button>
         </div>
       )}
+
+      <ShareModal
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        url={window.location.href}
+        title="Join My Music Room 🎶"
+        roomId={roomid || ""}
+      />
     </div>
   );
 };

@@ -11,10 +11,21 @@ const Toaster = ({ ...props }: ToasterProps) => {
       style={
         {
           "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
+          "--normal-text": "hsl(222.2 84% 4.9%)", 
           "--normal-border": "var(--border)",
+          "--normal-description": "hsl(215 16% 47%)", 
+          "--success-bg": "hsl(143.8 69.5% 95%)",
+          "--success-text": "hsl(142.1 70.6% 45.3%)",
+          "--error-bg": "hsl(0 84.2% 95.2%)",
+          "--error-text": "hsl(0 72.2% 50.6%)",
+          "--toast-shadow": "0 2px 8px rgba(0, 0, 0, 0.08)",
         } as React.CSSProperties
       }
+      toastOptions={{
+        classNames: {
+          description: "text-[var(--normal-description)] text-sm mt-1"
+        }
+      }}
       {...props}
     />
   )
