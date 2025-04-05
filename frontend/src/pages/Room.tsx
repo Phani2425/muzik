@@ -21,6 +21,7 @@ import { extractYoutubeId } from "@/utils/utils";
 import useUserStore from "@/zustand/userStore";
 import { CurrentPlayerState } from "@/utils/types";
 import ShareModal from "@/components/ShareModal";
+import { FcApproval } from "react-icons/fc";
 
 interface HomeProp {
   socket: Socket | null;
@@ -346,9 +347,9 @@ const Room: React.FC<HomeProp> = ({ socket }) => {
               onClick={copyHandler}
             >
               <span className="text-xs text-gray-700">
-                {roomCodeCopied ? "copied" : "copy code"}
+                {roomCodeCopied ? <span className="text-green-500 font-semibold flex gap-1 items-center ">copied <FcApproval className="text-lg" /></span>: <span className="font-semibold">copy code</span> }
               </span>
-              {!roomCodeCopied && <Copy size={16} />}
+              {!roomCodeCopied && <Copy className="font-semibold" size={15} />}
             </button>
             <button onClick={shareHandler} className="cursor-pointer">
               <Share2Icon size={24} className="font-semibold" />
